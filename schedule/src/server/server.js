@@ -2,8 +2,14 @@
 const express = require('express'),
     app = express(),
     axios = require('axios');  
-    //var mysql = require('mysql');
+    
+    var mysql = require('mysql2');  
 
+    var con = mysql.createConnection({
+        host: "localhost",
+        user: "root",
+        password: "1717",
+      });
 app.listen(3000, () => {
     console.log('Server is running at http://localhost:3000');
     });
@@ -268,55 +274,62 @@ async function getLectorsfromPage(pageNum){
             //stuff_name=stuff_name.concat(temp_name)
             temp_id=stuff[j].match(r_stuffid)
             //stuff_id=stuff_id.concat(temp_id)
-            lectors.push([temp_name[0],temp_id[0]])
+            lectors.push([temp_name[0],Number(temp_id[0])])
         }
 })
 }
 
 app.get('/staff', async function(req, res) {
-    
-    for (i=1;i<10;i++)
+    lectors=[]
+    for (i=1;i<3;i++)
     {
         await getLectorsfromPage(i)
+        console.log(i,"-я страница загружена")
     }
     res.send(lectors)
     console.log(lectors)
-
+    insertLectorsintoDB()
 })
 
-// var con = mysql.createConnection({
-//     host: "localhost",
-//     user: "senja",
-//     password: "1",
-//     database: "lectors"
-//   });
+function insertLectorsintoDB(){
+    con.connect(function(err) {
+        if (err) throw err;
+        console.log("Connected!");
+        con.query("DROP DATABASE if exists Schedule", function (err, result) {  
+            if (err) throw err;  
+            console.log("Database deleted");  
+            });  
+        con.query("CREATE DATABASE if not exists schedule", function (err, result) {  
+            if (err) throw err;  
+            console.log("Database created");  
+            });  
+        con.query("Use schedule", function (err, result) {  
+            if (err) throw err;  
+            console.log("Database created");  
+            });  
+        con.query("CREATE TABLE if not exists lectors( lector_id int primary key NOT NULL AUTO_INCREMENT,fullname varchar(255), id int )", function (err, result) {  
+            if (err) throw err;  
+            console.log("Database created");  
+            });  
+        var sql = "INSERT INTO schedule.lectors(fullname, id) VALUES ?";
+        con.query(sql, [lectors], function (err, result) {
+        if (err) throw err;
+        console.log("Number of records inserted: " + result.affectedRows);
+        });
+  });
 
-// con.connect(function(err) {
-//     if (err) throw err;
-//     console.log("Connected!");
-//     var sql = "INSERT INTO customers (name, address) VALUES ?";
-//     var values = [
-//       ['John', 'Highway 71'],
-//       ['Peter', 'Lowstreet 4'],
-//       ['Amy', 'Apple st 652'],
-//       ['Hannah', 'Mountain 21'],
-//       ['Michael', 'Valley 345'],
-//       ['Sandy', 'Ocean blvd 2'],
-//       ['Betty', 'Green Grass 1'],
-//       ['Richard', 'Sky st 331'],
-//       ['Susan', 'One way 98'],
-//       ['Vicky', 'Yellow Garden 2'],
-//       ['Ben', 'Park Lane 38'],
-//       ['William', 'Central st 954'],
-//       ['Chuck', 'Main Road 989'],
-//       ['Viola', 'Sideway 1633']
-//     ];
-//     con.query(sql, [values], function (err, result) {
-//       if (err) throw err;
-//       console.log("Number of records inserted: " + result.affectedRows);
-//     });
-//   });
+}
 
+
+app.get("/createDatabase", (req, res) => {
+
+    con.connect(function(err) {  
+        if (err) throw err;  
+        console.log("Connected!");  
+        
+    })
+    res.send("Database created")
+});
 
 app.get('/lectors', async function(req, res){
     res.send(stuff_id)
