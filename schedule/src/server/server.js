@@ -2,42 +2,11 @@
 const express = require('express'),
     app = express(),
     axios = require('axios');  
-    const jsonParser = express.json();
+    //var mysql = require('mysql');
 
 app.listen(3000, () => {
     console.log('Server is running at http://localhost:3000');
     });
-
-    const idLetters = {
-        "А": 1,
-        "Б": 2,
-        "В": 3,
-        "Г": 4,
-        "Д": 5,
-        "Е": 6,
-        "Ж": 7,
-        "З": 8,
-        "И": 9,
-        "К": 10,
-        "Л": 11,
-        "М": 12,
-        "Н": 13,
-        "О": 14,
-        "П": 15,
-        "Р": 16,
-        "С": 17,
-        "Т": 18,
-        "У": 19,
-        "Ф": 20,
-        "Х": 21,
-        "Ц": 22,
-        "Ч": 23,
-        "Ш": 24,
-        "Щ": 25,
-        "Э": 26,
-        "Ю": 27,
-        "Я": 28,
-    }
     
     const lessonTypes = {
         "1": "Лекция",
@@ -278,9 +247,77 @@ app.get('/search/:number', async function(req, res){
         }   
     }
     link=linkGroupList[groupNum]
-    prom= new Promise((resolve,reject)=>{
-        r = getGroupSchedule(link,12,1)
-        resolve(r)
+    r = getGroupSchedule(link,12,1)
+    res.send(r)
     })
-    prom.then((r)=>{res.send(r)})
+
+
+var stuff_name=[]
+var stuff_id=[]
+var lectors=[]
+
+async function getLectorsfromPage(pageNum){
+    let r= /href="https:\/\/ssau\.ru\/staff\/(\d+)-(.)*">\n.*\n/g
+    let r_name=/(.)*([А-ЯЁ]|[а-яё]|(\.)|( )|(-)){4,}/g
+    let r_stuffid= /(\d)+/g
+    const response = await axios.get(`https://ssau.ru/staff?page=${pageNum}&letter=0`).then(function(res){
+        text=res.data
+        stuff= text.match(r)
+        for (j=0;j<stuff.length;j++){
+            temp_name=stuff[j].match(r_name)
+            //stuff_name=stuff_name.concat(temp_name)
+            temp_id=stuff[j].match(r_stuffid)
+            //stuff_id=stuff_id.concat(temp_id)
+            lectors.push([temp_name[0],temp_id[0]])
+        }
+})
+}
+
+app.get('/staff', async function(req, res) {
+    
+    for (i=1;i<10;i++)
+    {
+        await getLectorsfromPage(i)
+    }
+    res.send(lectors)
+    console.log(lectors)
+
+})
+
+// var con = mysql.createConnection({
+//     host: "localhost",
+//     user: "senja",
+//     password: "1",
+//     database: "lectors"
+//   });
+
+// con.connect(function(err) {
+//     if (err) throw err;
+//     console.log("Connected!");
+//     var sql = "INSERT INTO customers (name, address) VALUES ?";
+//     var values = [
+//       ['John', 'Highway 71'],
+//       ['Peter', 'Lowstreet 4'],
+//       ['Amy', 'Apple st 652'],
+//       ['Hannah', 'Mountain 21'],
+//       ['Michael', 'Valley 345'],
+//       ['Sandy', 'Ocean blvd 2'],
+//       ['Betty', 'Green Grass 1'],
+//       ['Richard', 'Sky st 331'],
+//       ['Susan', 'One way 98'],
+//       ['Vicky', 'Yellow Garden 2'],
+//       ['Ben', 'Park Lane 38'],
+//       ['William', 'Central st 954'],
+//       ['Chuck', 'Main Road 989'],
+//       ['Viola', 'Sideway 1633']
+//     ];
+//     con.query(sql, [values], function (err, result) {
+//       if (err) throw err;
+//       console.log("Number of records inserted: " + result.affectedRows);
+//     });
+//   });
+
+
+app.get('/lectors', async function(req, res){
+    res.send(stuff_id)
     })
