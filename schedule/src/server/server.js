@@ -1,16 +1,25 @@
+import * as DB from '../DB/functional.js';
+import express from 'express';
+import axios from 'axios';
+import mysql from 'mysql2';
 
-const express = require('express'),
-    app = express(),
-    axios = require('axios');  
-    
-    var mysql = require('mysql2');  
 
-    var con = mysql.createConnection({
-        host: "localhost",
-        user: "root",
-        password: "1717",
-      });
-app.listen(3000, () => {
+const app = express()
+
+var connection = mysql.createConnection({
+    host: "localhost",
+    user: "root",
+    password: "1717",
+    });
+
+
+app.listen(3000, async function(){
+    let lectors=await getLectors()
+    let groups=await getGroups()
+    console.log(groups)
+    DB.createDB(connection)
+    DB.insertLectorsintoDB(connection,lectors)
+    DB.insertGroupsintoDB(connection,groups)
     console.log('Server is running at http://localhost:3000');
     });
     
@@ -23,111 +32,122 @@ app.listen(3000, () => {
         "6": "Курсовой проект"
     }
 
-const reg_time_matr=[/(9:35)((.|\n)*)(?=(9:45))+/g,
-    /(11:20)((.|\n)*)(?=(11:30))/g,
-    /(13:05)((.|\n)*)(?=(13:30))/g,
-    /(15:05)((.|\n)*)(?=(15:15))/g,
-    /(16:50)((.|\n)*)(?=(17:00))/g,
-    /(18:35)((.|\n)*)(?=(18:45))/g,
-    /(20:15)((.|\n)*)(?=(20:25))/g
-]
+//var faculties=[]
 
-var faculties=[]
-var linkGroupList=[]
-var numGroupList=[]
+const transpose = matrix => matrix[0].map((col, i) => matrix.map(row => row[i]));
 
-
-app.get('/faculties', (req, res) => {
-    const response = axios.get(`https://ssau.ru/rasp/`).then(function(res){
+async function getFaculties(){
+    let faculties=[]
+    const response = await axios.get(`https://ssau.ru/rasp/`).then(function(res){
         faculties=res.data
         let r= /\/rasp\/faculty\/([0-9]){9}\?course=1/g
         faculties= faculties.match(r)
         faculties=faculties.map((el)=>'https://ssau.ru'+el)
-        console.log(faculties)
-    })
-    res.send("aaaaaaaaaa")});
-   
+        //console.log(faculties)
+    }).catch((error) => {
+        console.error(error);});
+    return faculties
+}
 
-const transpose = matrix => matrix[0].map((col, i) => matrix.map(row => row[i]));
-
-app.get('/groups', (req, res) => {
+async function getGroupsbyFaculties(faculties){
+    console.log(faculties)
+    var linkGroupList=[]
+    var numGroupList=[]
+    var groups=[]
     var templinkGroupList=[]
     var tempnumGroupList =[]
-    for (j=0;j<faculties.length;j++){
-        for (i=1;i<6;i++){
-        const response = axios.get(faculties[j]).then(function(res){
-        text=res.data
-        let r_1=  /\/rasp\?groupId=([0-9])(\d+)/g
-        let r_2= /<span>([0-9]){4}-([0-9]){6}(.)<\/span>/g
+    var r_groupid=/(\d)+/g
+    var r_1=  /\/rasp\?groupId=([0-9])(\d+)/g
+    var r_2= /<span>([0-9]){4}-([0-9]){6}(.)<\/span>/g
+    for (let j=0;j<1;j++){ //111111111111111111111111111111111 faculties.length
+        for (let i=1;i<6;i++){
+        const response = await axios.get(faculties[j])
+        .then(function(res){
+        let text=res.data
         templinkGroupList= text.match(r_1)
         tempnumGroupList = text.match(r_2)
-        if (templinkGroupList!=null){
-            templinkGroupList=templinkGroupList.map((el)=>'https://ssau.ru'+el)
-            linkGroupList=linkGroupList.concat(templinkGroupList)
-            console.log(faculties[j])
-        }
-        if (tempnumGroupList!=null){
-            tempnumGroupList=tempnumGroupList.map((el)=>el.substring(6, el.length-7))
-            numGroupList=numGroupList.concat(tempnumGroupList)
-            console.log(faculties[j])
-        }
-    })
+        
+        if (templinkGroupList!=null  && tempnumGroupList!=null){
+            
+                templinkGroupList=templinkGroupList.map((el)=>el.match(r_groupid)[0])
+                linkGroupList=linkGroupList.concat(templinkGroupList)
+                tempnumGroupList=tempnumGroupList.map((el)=>el.substring(6, el.length-7))
+                numGroupList=numGroupList.concat(tempnumGroupList)
+            for (let k=0;k<templinkGroupList.length;k++){
+                groups.push([tempnumGroupList[k],templinkGroupList[k]])
+            }
+            //console.log(faculties[j])
+        }})
+        .catch((error) => {
+            console.error(error);});
+        
         faculties[j] = faculties[j].substring(0, faculties[j].length-1) + `${i+1}`
     }
     }
-    res.send(faculties)});
+    console.log(groups)
+    return groups
+}
+
+async function getGroups(){
+    let faculties = await getFaculties()
+    let groups = await getGroupsbyFaculties(faculties)
+    return groups
+}
 
 
-function getGroupSchedule(link, selectedWeek, selectedWeekday){
-    let link_to_schedule=`${link}&selectedWeek=${selectedWeek}&selectedWeekday=${selectedWeekday}`
-    axios.get(link_to_schedule).then(function(response){
-    responseData = response.data
+async function getGroupSchedule(link, selectedWeek, selectedWeekday){
+    var t
+    var subjectsMatrix = []
+    let link_to_schedule=`https://ssau.ru/rasp?groupId=${link}&selectedWeek=${selectedWeek}&selectedWeekday=${selectedWeekday}`
+    const response = await axios.get(link_to_schedule).then(function(response){
+    let responseData = response.data
     const rawScheduleRegex = /class="schedule__time-item">((.|\n)*)class="footer"/g
     const rawSchedule = responseData.match(rawScheduleRegex)
     if (rawSchedule === null){
-        isIntroduced = (/расписание пока не введено/i).test(responseData)
+        let isIntroduced = (/Расписание пока не введено/i).test(responseData)
         if(isIntroduced){
             return "Расписание не введено"
         }
         else{
+            console.log(responseData)
             return []
         }
     } 
     const rawTimeScheduleRegex = /(\d\d:\d\d)((.|\n)(?!(\d\d:\d\d)))*/g
     const rawTimeSchedule = rawSchedule[0].match(rawTimeScheduleRegex)
-    rawSubjectsMatrix = []
+    let rawSubjectsMatrix = []
     const rawAnotherSubjectMatrix = []
-    timeMatrix = []
-    for (rawScheduleListNumber = 1; rawScheduleListNumber < rawTimeSchedule.length; rawScheduleListNumber+=2){
+    let timeMatrix = []
+    for (let rawScheduleListNumber = 1; rawScheduleListNumber < rawTimeSchedule.length; rawScheduleListNumber+=2){
         const subjectRegex = /<div(\n?)class="schedule__item((.|\n)(?!(<div(\n?)class="schedule__item)))*/g
         const anotherSubjectRegex = /schedule__item(.|\n)*?<\/div><\/div><\/div><div/g
         const timeRegex = /\d\d:\d\d/g
-        startTime = rawTimeSchedule[rawScheduleListNumber-1].match(timeRegex)
-        finishTime = rawTimeSchedule[rawScheduleListNumber].match(timeRegex)
+        let startTime = rawTimeSchedule[rawScheduleListNumber-1].match(timeRegex)
+        let finishTime = rawTimeSchedule[rawScheduleListNumber].match(timeRegex)
         timeMatrix.push({startTime: startTime[0], finishTime: finishTime[0]})
         rawSubjectsMatrix.push(rawTimeSchedule[rawScheduleListNumber].match(subjectRegex))
         rawAnotherSubjectMatrix.push(rawTimeSchedule[rawScheduleListNumber].match(anotherSubjectRegex))
     }   
-    subjectsMatrix = []
-    typeSubjectMatrix = []
-    groupsMatrix = []
-    placeMatrix = []
-    lectorMatrix = []
-    groupSchedule = []
-    for (rawSubjectListNumber=0; rawSubjectListNumber<rawSubjectsMatrix.length; rawSubjectListNumber++){
+    let typeSubjectMatrix = []
+    let groupsMatrix = []
+    let placeMatrix = []
+    let lectorMatrix = []
+    let groupSchedule = []
+    for (let rawSubjectListNumber=0; rawSubjectListNumber<rawSubjectsMatrix.length; rawSubjectListNumber++){
         subjectsMatrix.push([])
         typeSubjectMatrix.push([])
         groupsMatrix.push([])
         placeMatrix.push([])
         lectorMatrix.push([])
-        for (rawSubjectIndex=0; rawSubjectIndex<rawSubjectsMatrix[rawSubjectListNumber].length; rawSubjectIndex++){
+        if (rawSubjectsMatrix[rawSubjectListNumber]!=null){
+        for (let rawSubjectIndex=0; rawSubjectIndex<rawSubjectsMatrix[rawSubjectListNumber].length; rawSubjectIndex++){
             const rawSubjectNameRegex = /lesson-color-type-\d(.)*</g
             const subjectRegex = / ((.)*)(?!<\/div>)/g
-            rawSubject = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectNameRegex)
+            let rawSubject = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectNameRegex)
             if(rawSubject !== null) {
                 subjectsMatrix[rawSubjectListNumber].push([])
-                for (subjectIndex = 0; subjectIndex < rawSubject.length; subjectIndex++){
-                    subject = rawSubject[subjectIndex].match(subjectRegex)
+                for (let subjectIndex = 0; subjectIndex < rawSubject.length; subjectIndex++){
+                    let subject = rawSubject[subjectIndex].match(subjectRegex)
                     subject = subject[0].replace(/<\/div></g,"").substring(1)
                     subjectsMatrix[rawSubjectListNumber][rawSubjectIndex].push(subject)
                 }
@@ -138,11 +158,11 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
 
             const rawTypeRegex = /lesson-color-type-\d/g
             const typeNumberRegex = /\d/g
-            rawType = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawTypeRegex)
+            let rawType = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawTypeRegex)
             if(rawType !== null) {
                 typeSubjectMatrix[rawSubjectListNumber].push([])
-                for (typeIndex = 0; typeIndex < rawType.length; typeIndex++){
-                    type = rawType[typeIndex].match(typeNumberRegex)
+                for (let typeIndex = 0; typeIndex < rawType.length; typeIndex++){
+                    let type = rawType[typeIndex].match(typeNumberRegex)
                     typeSubjectMatrix[rawSubjectListNumber][rawSubjectIndex].push(lessonTypes[type])
                 }
             }
@@ -155,14 +175,14 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
             const rawGroupIdRegex = /\/rasp\?groupId=(\d)*/g
             const groupIdRegex = /(\d)+/g
             const groupNumberRegex = /(\d{4})-(\d{6})(\D?)/g
-            rawGroup = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawGroupRegex)
+            let rawGroup = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawGroupRegex)
             if (rawGroup!== null){
                 groupsMatrix[rawSubjectListNumber].push([])
-                for (rawGroupIndex = 0; rawGroupIndex < rawGroup.length; rawGroupIndex++){
-                    rawGroupNumber = rawGroup[rawGroupIndex].match(rawGroupNumberRegex)
-                    rawGroupId =  rawGroup[rawGroupIndex].match(rawGroupIdRegex)
-                    groupNumber = rawGroupNumber[0].match(groupNumberRegex)
-                    groupId = rawGroupId[0].match(groupIdRegex)
+                for (let rawGroupIndex = 0; rawGroupIndex < rawGroup.length; rawGroupIndex++){
+                    let rawGroupNumber = rawGroup[rawGroupIndex].match(rawGroupNumberRegex)
+                    let rawGroupId =  rawGroup[rawGroupIndex].match(rawGroupIdRegex)
+                    let groupNumber = rawGroupNumber[0].match(groupNumberRegex)
+                    let groupId = rawGroupId[0].match(groupIdRegex)
                     groupsMatrix[rawSubjectListNumber][rawSubjectIndex].push([{"groupNumber":groupNumber[0]},{"groupId": groupId}])
                 }
             }
@@ -172,11 +192,11 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
 
             const rawSubjectPlaceRegex = /schedule__place\">(.)*<\/div>/g
             const subjectPlaceRegex = />(.)*</g
-            rawSubjectPlace = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectPlaceRegex)
+            let rawSubjectPlace = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectPlaceRegex)
             if (rawSubjectPlace!==null){
                 placeMatrix[rawSubjectListNumber].push([])
-                for (rawPlaceIndex = 0; rawPlaceIndex < rawSubjectPlace.length; rawPlaceIndex++){
-                    subjectPlace = rawSubjectPlace[rawPlaceIndex].match(subjectPlaceRegex)
+                for (let rawPlaceIndex = 0; rawPlaceIndex < rawSubjectPlace.length; rawPlaceIndex++){
+                    let subjectPlace = rawSubjectPlace[rawPlaceIndex].match(subjectPlaceRegex)
                     placeMatrix[rawSubjectListNumber][rawSubjectIndex].push(subjectPlace[0].substring(2).slice(0, -1))
                 }
             }
@@ -184,10 +204,11 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
                 placeMatrix[rawSubjectListNumber].push(null)
             }
         }
-
-        for(rawSubjectIndex=0; rawSubjectIndex<rawAnotherSubjectMatrix[rawSubjectListNumber].length; rawSubjectIndex++){
+    }
+        if (rawAnotherSubjectMatrix[rawSubjectListNumber]!=null){
+        for(let rawSubjectIndex=0; rawSubjectIndex<rawAnotherSubjectMatrix[rawSubjectListNumber].length; rawSubjectIndex++){
             const rawLectorNameRegex = /schedule__teacher(.|\n)*?<\/div>/g
-            rawLectorName = rawAnotherSubjectMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawLectorNameRegex)
+            let rawLectorName = rawAnotherSubjectMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawLectorNameRegex)
             if (rawLectorName !== null){
                 let subGroup = []
                 const rawSubGroupRegex = /Подгруппы: \d/g
@@ -199,11 +220,11 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
                     }
                 }
                 lectorMatrix[rawSubjectListNumber].push([])
-                for (rawLectorIndex = 0; rawLectorIndex < rawLectorName.length; rawLectorIndex++){
+                for (let rawLectorIndex = 0; rawLectorIndex < rawLectorName.length; rawLectorIndex++){
                     const lectorNameRegex = />([А-ЯЁ]|[а-яё]|(\.)|( )|(-)){4,}</g
                     const lectorIdRegex = /(\d)+/g
                     const lectorName = rawLectorName[rawLectorIndex].match(lectorNameRegex)[0].substring(1).slice(0,-1) 
-                    lectorId = rawLectorName[rawLectorIndex].match(lectorIdRegex)
+                    let lectorId = rawLectorName[rawLectorIndex].match(lectorIdRegex)
                     if(lectorId === null){
                         lectorId = [-1]
                     }
@@ -216,6 +237,7 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
                 }
             }
         }
+    }
     }
     subjectsMatrix.forEach((subjectList, subjectListIndex) =>{
         groupSchedule.push([])
@@ -240,97 +262,200 @@ function getGroupSchedule(link, selectedWeek, selectedWeekday){
         })
     })
     t = transpose(groupSchedule)
-    return JSON.parse(JSON.stringify(t))
     })
+    return JSON.parse(JSON.stringify(t))
 }
 
-    
-app.get('/search/:number', async function(req, res){
-    let groupNum=''
-    for (i=0;i<numGroupList.length;i++){
-        if (numGroupList[i].includes(req.params.number)){
-            groupNum=numGroupList.indexOf(numGroupList[i])
-        }   
+async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
+    var t
+    var subjectsMatrix = []
+    const response = await axios.get(`https://ssau.ru/rasp?staffId=${staffId}&selectedWeek=${selectedWeek}&selectedWeekday=${selectedWeekday}`)
+    .then(function(res){
+    let responseData=res.data
+    const rawScheduleRegex = /class="schedule__time-item">((.|\n)*)class="footer"/g
+    const rawSchedule = responseData.match(rawScheduleRegex)
+    if (rawSchedule === null){
+        let isIntroduced = (/Расписание пока не введено/i).test(responseData)
+        if(isIntroduced){
+            return "Расписание не введено"
+        }
+        else{
+            return []
+        }
+    } 
+    const rawTimeScheduleRegex = /(\d\d:\d\d)((.|\n)(?!(\d\d:\d\d)))*/g
+    const rawTimeSchedule = rawSchedule[0].match(rawTimeScheduleRegex)
+    let rawSubjectsMatrix = []
+    let timeMatrix = []
+    let lectorSchedule = []
+    for (let rawScheduleListNumber = 1; rawScheduleListNumber < rawTimeSchedule.length; rawScheduleListNumber+=2){
+        const subjectRegex = /<div(\n?)class="schedule__item((.|\n)(?!(<div(\n?)class="schedule__item)))*/g
+        const timeRegex = /\d\d:\d\d/g
+        let startTime = rawTimeSchedule[rawScheduleListNumber-1].match(timeRegex)
+        let finishTime = rawTimeSchedule[rawScheduleListNumber].match(timeRegex)
+        timeMatrix.push([startTime[0], finishTime[0]])
+        rawSubjectsMatrix.push(rawTimeSchedule[rawScheduleListNumber].match(subjectRegex))
+    }   
+    let typeSubjectMatrix = []
+    let groupsMatrix = []
+    let placeMatrix = []
+    for (let rawSubjectListNumber=0; rawSubjectListNumber<rawSubjectsMatrix.length; rawSubjectListNumber++){
+        subjectsMatrix.push([])
+        typeSubjectMatrix.push([])
+        groupsMatrix.push([])
+        placeMatrix.push([])
+        for (let rawSubjectIndex=0; rawSubjectIndex<rawSubjectsMatrix[rawSubjectListNumber].length; rawSubjectIndex++){
+            const rawSubjectNameRegex = /lesson-color-type-\d(.)*</g
+            const subjectRegex = / ((.)*)(?!<\/div>)/g
+            let rawSubject = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectNameRegex)
+            if(rawSubject !== null) {
+                let subject = rawSubject[0].match(subjectRegex)
+                subject = subject[0].replace(/<\/div></g,"").substring(1)
+                subjectsMatrix[rawSubjectListNumber].push(subject)
+            }
+            else{
+                subjectsMatrix[rawSubjectListNumber].push(null)
+            }
+
+            const rawTypeRegex = /lesson-color-type-\d/g
+            const typeNumberRegex = /\d/g
+            let rawType = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawTypeRegex)
+            if(rawType !== null) {
+                let type = rawType[0].match(typeNumberRegex)
+                typeSubjectMatrix[rawSubjectListNumber].push(lessonTypes[type])
+            }
+            else{
+                typeSubjectMatrix[rawSubjectListNumber].push(null)
+            }
+            const rawGroupRegex = /href=\"\/rasp\?groupId=(.)*<\/a>/g
+            const rawGroupNumberRegex = /schedule__group\">(.)*</g
+            const rawGroupIdRegex = /\/rasp\?groupId=(\d)*/g
+            const groupIdRegex = /(\d)+/g
+            const groupNumberRegex = /(\d{4})-(\d{6})(\D)?( \(\d\))?/g
+            let rawGroup = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawGroupRegex)
+            console.log(rawGroup)
+            if (rawGroup!== null){
+                groupsMatrix[rawSubjectListNumber].push([])
+                for (let rawGroupIndex = 0; rawGroupIndex < rawGroup.length; rawGroupIndex++){
+                    let rawGroupNumber = rawGroup[rawGroupIndex].match(rawGroupNumberRegex)
+                    let rawGroupId = rawGroup[rawGroupIndex].match(rawGroupIdRegex)
+                    console.log(rawGroupNumber[0])
+                    let groupNumber = rawGroupNumber[0].match(groupNumberRegex)
+                    let groupId = rawGroupId[0].match(groupIdRegex)
+                    var group = new Object()
+                        group.groupNumber = groupNumber[0]
+                        group.groupId = groupId[0]
+                    groupsMatrix[rawSubjectListNumber][rawSubjectIndex].push(group)
+                }
+            }
+            else{
+                groupsMatrix[rawSubjectListNumber].push(null)
+            }
+
+            const rawSubjectPlaceRegex = /schedule__place\">(.)*<\/div>/g
+            const subjectPlaceRegex = />(.)*</g
+            let rawSubjectPlace = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectPlaceRegex)
+            if (rawSubjectPlace!==null){
+                let subjectPlace = rawSubjectPlace[0].match(subjectPlaceRegex)
+                placeMatrix[rawSubjectListNumber].push(subjectPlace[0].substring(2).slice(0, -1))
+            }
+            else{
+                placeMatrix[rawSubjectListNumber].push(null)
+            }
+        }
     }
-    link=linkGroupList[groupNum]
-    r = getGroupSchedule(link,12,1)
-    res.send(r)
+    subjectsMatrix.forEach((subjectList, subjectListIndex) =>{
+        lectorSchedule.push([])
+        subjectList.forEach((subject, subjectIndex) =>{
+            if(subject===null){
+                lectorSchedule[subjectListIndex].push(null)
+            }
+            else{
+                var element = new Object()
+                    element.subject = subjectsMatrix[subjectListIndex][subjectIndex]
+                    var time = new Object()
+                        time.startTime = timeMatrix[subjectListIndex][0]
+                        time.finishTime = timeMatrix[subjectListIndex][1]
+                    element.time = time
+                    element.place = placeMatrix[subjectListIndex][subjectIndex]
+                    element.groups = groupsMatrix[subjectListIndex][subjectIndex]
+                    element.type = typeSubjectMatrix[subjectListIndex][subjectIndex]
+                lectorSchedule[subjectListIndex].push(element)
+            }
+        })
     })
+    t = transpose(lectorSchedule)
+    })
+    return JSON.parse(JSON.stringify(t))
+}
+    
 
 
-var stuff_name=[]
-var stuff_id=[]
-var lectors=[]
 
-async function getLectorsfromPage(pageNum){
+async function getLectors(){
+    var lectors=[]
     let r= /href="https:\/\/ssau\.ru\/staff\/(\d+)-(.)*">\n.*\n/g
     let r_name=/(.)*([А-ЯЁ]|[а-яё]|(\.)|( )|(-)){4,}/g
     let r_stuffid= /(\d)+/g
-    const response = await axios.get(`https://ssau.ru/staff?page=${pageNum}&letter=0`).then(function(res){
-        text=res.data
-        stuff= text.match(r)
-        for (j=0;j<stuff.length;j++){
-            temp_name=stuff[j].match(r_name)
-            //stuff_name=stuff_name.concat(temp_name)
-            temp_id=stuff[j].match(r_stuffid)
-            //stuff_id=stuff_id.concat(temp_id)
-            lectors.push([temp_name[0],Number(temp_id[0])])
-        }
-})
-}
-
-app.get('/staff', async function(req, res) {
-    lectors=[]
-    for (i=1;i<3;i++)
+    for (let i=1;i<2;i++)
     {
-        await getLectorsfromPage(i)
+        const response = await axios.get(`https://ssau.ru/staff?page=${i}&letter=0`).then(function(res){
+            let text=res.data
+            let stuff= text.match(r)
+            for (let j=0;j<stuff.length;j++){
+                let temp_name=stuff[j].match(r_name)
+                let temp_id=stuff[j].match(r_stuffid)
+                lectors.push([temp_name[0],Number(temp_id[0])])
+            }
+            
+        }).catch((error) => {
+            console.error(error);});
         console.log(i,"-я страница загружена")
     }
-    res.send(lectors)
-    console.log(lectors)
-    insertLectorsintoDB()
-})
-
-function insertLectorsintoDB(){
-    con.connect(function(err) {
-        if (err) throw err;
-        console.log("Connected!");
-        con.query("DROP DATABASE if exists Schedule", function (err, result) {  
-            if (err) throw err;  
-            console.log("Database deleted");  
-            });  
-        con.query("CREATE DATABASE if not exists schedule", function (err, result) {  
-            if (err) throw err;  
-            console.log("Database created");  
-            });  
-        con.query("Use schedule", function (err, result) {  
-            if (err) throw err;  
-            console.log("Database created");  
-            });  
-        con.query("CREATE TABLE if not exists lectors( lector_id int primary key NOT NULL AUTO_INCREMENT,fullname varchar(255), id int )", function (err, result) {  
-            if (err) throw err;  
-            console.log("Database created");  
-            });  
-        var sql = "INSERT INTO schedule.lectors(fullname, id) VALUES ?";
-        con.query(sql, [lectors], function (err, result) {
-        if (err) throw err;
-        console.log("Number of records inserted: " + result.affectedRows);
-        });
-  });
-
+    return lectors
 }
 
 
-app.get("/createDatabase", (req, res) => {
+app.get('/staff', async function(req, res) {
+    var lectors= await DB.getStufffromDB(connection)
+    //console.log(lectors);
+    res.send(lectors)
+})
 
-    con.connect(function(err) {  
-        if (err) throw err;  
-        console.log("Connected!");  
-        
-    })
-    res.send("Database created")
-});
+app.get('/groups', async function(req, res) {
+    var groups= await DB.getGroupsfromDB(connection)
+    //console.log(lectors);
+    res.send(groups)
+})
 
-app.get('/lectors', async function(req, res){
-    res.send(stuff_id)
-    })
+
+
+app.get('/staff/:name', async function(req, res) {
+    var lector= await DB.getLectorIdByName(connection,req.params.name)
+    var text = await getLectorSchedule(String(lector),12,1)
+    //var text = await getLectorSchedule('64778001',12,1)
+    
+    //console.log(lectors);
+    res.send(text)
+})
+
+app.get('/group/:number', async function(req, res) {
+    var group= await DB.getGroupIdByNumber(connection,req.params.number)
+    var text = await getGroupSchedule(String(group),12,1)
+    //var text = await getLectorSchedule('64778001',12,1)
+    
+    //console.log(lectors);
+    res.send(text)
+})
+
+
+app.get('/staff/search/:firstletters', async function(req, res) {
+    var lectors= await DB.getLectorsNameStartWith(connection,req.params.firstletters)
+    console.log("get lectorswith a specific first letters");
+    res.send(lectors)
+})
+
+// app.get('/staff?id=', async function(req, res) {
+//     console.log(lectors)
+//     res.send(lectors)
+// })
