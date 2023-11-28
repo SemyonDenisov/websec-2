@@ -104,12 +104,11 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
     const rawScheduleRegex = /class="schedule__time-item">((.|\n)*)class="footer"/g
     const rawSchedule = responseData.match(rawScheduleRegex)
     if (rawSchedule === null){
-        let isIntroduced = (/Расписание пока не введено/i).test(responseData)
+        let isIntroduced = (/асписание пока не введено/g).test(responseData)
         if(isIntroduced){
             return "Расписание не введено"
         }
         else{
-            console.log(responseData)
             return []
         }
     } 
@@ -155,7 +154,6 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
             else{
                 subjectsMatrix[rawSubjectListNumber].push(null)
             }
-
             const rawTypeRegex = /lesson-color-type-\d/g
             const typeNumberRegex = /\d/g
             let rawType = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawTypeRegex)
@@ -215,7 +213,7 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
                 const rawSubGroup = rawAnotherSubjectMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubGroupRegex)
                 if(rawSubGroup !== null){
                     const subGroupRegex = /\d/g
-                    for (indexSub = 0; indexSub < rawSubGroup.length; indexSub++){
+                    for (let indexSub = 0; indexSub < rawSubGroup.length; indexSub++){
                         subGroup.push(rawSubGroup[indexSub].match(subGroupRegex)[0])
                     }
                 }
@@ -263,7 +261,13 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
     })
     t = transpose(groupSchedule)
     })
+    if (t){
     return JSON.parse(JSON.stringify(t))
+    }
+    else {
+        t=new Object()
+        return JSON.parse(JSON.stringify(t))
+    }
 }
 
 async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
@@ -275,7 +279,7 @@ async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
     const rawScheduleRegex = /class="schedule__time-item">((.|\n)*)class="footer"/g
     const rawSchedule = responseData.match(rawScheduleRegex)
     if (rawSchedule === null){
-        let isIntroduced = (/Расписание пока не введено/i).test(responseData)
+        let isIntroduced = (/асписание пока не введено/i).test(responseData)
         if(isIntroduced){
             return "Расписание не введено"
         }
@@ -386,7 +390,13 @@ async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
     })
     t = transpose(lectorSchedule)
     })
-    return JSON.parse(JSON.stringify(t))
+    if (t){
+        return JSON.parse(JSON.stringify(t))
+        }
+        else {
+            t=new Object()
+            return JSON.parse(JSON.stringify(t))
+        }
 }
     
 
@@ -432,20 +442,32 @@ app.get('/groups', async function(req, res) {
 
 app.get('/staff/:name', async function(req, res) {
     var lector= await DB.getLectorIdByName(connection,req.params.name)
+    if (lector){
     var text = await getLectorSchedule(String(lector),12,1)
+    res.send(text)
+    }
+    else{
+        res.send("Такого преподавателя нет")
+    }
     //var text = await getLectorSchedule('64778001',12,1)
     
     //console.log(lectors);
-    res.send(text)
+    
 })
 
-app.get('/group/:number', async function(req, res) {
+app.get('/groups/:number', async function(req, res) {
     var group= await DB.getGroupIdByNumber(connection,req.params.number)
-    var text = await getGroupSchedule(String(group),12,1)
+    console.log(group)
+    if (group){
+        var text = await getGroupSchedule(String(group),12,1)
+        res.send(text)
+    }
+    else {
+        res.send("Такой группы нет")
+    }
     //var text = await getLectorSchedule('64778001',12,1)
     
     //console.log(lectors);
-    res.send(text)
 })
 
 

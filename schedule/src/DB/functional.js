@@ -90,11 +90,12 @@ export async function getLectorIdByName(connection,fullname){
 
 export async function getGroupIdByNumber(connection,group_number){
     var group
-    await connection.promise().query("select id from `groups` where group_number = ?",String(group_number))
+    group_number=group_number+'%'
+    await connection.promise().query("select id from `groups` where group_number like ? limit 1",group_number)
     .then(result => {  
         let response=result[0]
         group = response[0].id
-        console.log(lector);
+        console.log(group);
         })
         .catch(err =>{
             console.log(err);
