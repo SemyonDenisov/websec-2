@@ -1,4 +1,4 @@
-
+import { response } from 'express'
 
 export function insertGroupsintoDB(connection,groups){
     connection.connect(function(err) {
@@ -26,14 +26,14 @@ export async function getLectorFromDBById(connection,id){
     .then(result => {  
         let response=result[0]
         
-            lector = response[i].
+            lector = response[0].id
             console.log("Success (get lectors by name)");
         })
         .catch(err =>{
             console.log(err);
             });
         
-    return lectors
+    return lector
 }
 
 export async function getStufffromDB(connection){
@@ -42,16 +42,16 @@ export async function getStufffromDB(connection){
     .then(result => {  
         let response=result[0]
         for(let i=0; i < response.length; i++){
-            lectors.push([response[i].fullname,response[i].id])
+        lectors.push([response[i].fullname,response[i].id])
             }  
             console.log("Succes (get lectors)");
             //console.log();
         })
-        .catch(err =>{
+        .catch(err =>{  
             console.log(err);
             });
         
-    return lectors
+    return JSON.stringify(lectors)
 }
 
 export async function getGroupsfromDB(connection){
@@ -76,10 +76,17 @@ export async function getGroupsfromDB(connection){
 export async function getLectorIdByName(connection,fullname){
     var lector
     await connection.promise().query("select id from lectors where fullname = ?",fullname)
-    .then(result => {  
-        let response=result[0]
-        lector = response[0].id
-        console.log(lector);
+    .then(result => {
+        if ( result.lenght!=0) {// сюдддддддддддддддддааааааааааааа смотри
+        let response=result
+        lector = response[0][0].id
+        console.log(response);
+        }
+        else {
+            console.log(response);
+
+            return 0
+        }
         })
         .catch(err =>{
             console.log(err);
@@ -100,7 +107,6 @@ export async function getGroupIdByNumber(connection,group_number){
         .catch(err =>{
             console.log(err);
           });
-        
     return group
 }
 
@@ -147,7 +153,7 @@ export async function getLectorsNameStartWith(connection,firtsverbs){
     .then(result => {  
         let response=result[0]
         for(let i=0; i < response.length; i++){
-            lectors.push(response[i].fullname)
+            lectors.push({id:response[i].id,name:response[i].fullname})
             }  
             console.log("Success (get lectors by first verbs of name)");
         })

@@ -1,11 +1,12 @@
 import * as DB from '../DB/functional.js';
 import express from 'express';
+import cors from 'cors'
 import axios from 'axios';
 import mysql from 'mysql2';
 
 
 const app = express()
-
+app.use(cors());
 var connection = mysql.createConnection({
     host: "localhost",
     user: "root",
@@ -13,14 +14,14 @@ var connection = mysql.createConnection({
     });
 
 
-app.listen(3000, async function(){
+app.listen(3001, async function(){
     let lectors=await getLectors()
     let groups=await getGroups()
     console.log(groups)
     DB.createDB(connection)
     DB.insertLectorsintoDB(connection,lectors)
     DB.insertGroupsintoDB(connection,groups)
-    console.log('Server is running at http://localhost:3000');
+    console.log('Server is running at http://localhost:3001');
     });
     
     const lessonTypes = {
@@ -38,7 +39,7 @@ const transpose = matrix => matrix[0].map((col, i) => matrix.map(row => row[i]))
 
 async function getFaculties(){
     let faculties=[]
-    const response = await axios.get(`https://ssau.ru/rasp/`).then(function(res){
+    await axios.get(`https://ssau.ru/rasp/`).then(function(res){
         faculties=res.data
         let r= /\/rasp\/faculty\/([0-9]){9}\?course=1/g
         faculties= faculties.match(r)
@@ -61,7 +62,7 @@ async function getGroupsbyFaculties(faculties){
     var r_2= /<span>([0-9]){4}-([0-9]){6}(.)<\/span>/g
     for (let j=0;j<1;j++){ //111111111111111111111111111111111 faculties.length
         for (let i=1;i<6;i++){
-        const response = await axios.get(faculties[j])
+        await axios.get(faculties[j])
         .then(function(res){
         let text=res.data
         templinkGroupList= text.match(r_1)
@@ -95,11 +96,11 @@ async function getGroups(){
 }
 
 
-async function getGroupSchedule(link, selectedWeek, selectedWeekday){
+export async function getGroupSchedule(link, selectedWeek, selectedWeekday){
     var t
     var subjectsMatrix = []
     let link_to_schedule=`https://ssau.ru/rasp?groupId=${link}&selectedWeek=${selectedWeek}&selectedWeekday=${selectedWeekday}`
-    const response = await axios.get(link_to_schedule).then(function(response){
+    await axios.get(link_to_schedule).then(function(response){
     let responseData = response.data
     const rawScheduleRegex = /class="schedule__time-item">((.|\n)*)class="footer"/g
     const rawSchedule = responseData.match(rawScheduleRegex)
@@ -168,8 +169,8 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
                 typeSubjectMatrix[rawSubjectListNumber].push(null)
             }
 
-            const rawGroupRegex = /href=\"\/rasp\?groupId=(.)*>/g
-            const rawGroupNumberRegex = /schedule__group\">(.)* /g
+            const rawGroupRegex = /href="\/rasp\?groupId=(.)*>/g
+            const rawGroupNumberRegex = /schedule__group">(.)* /g
             const rawGroupIdRegex = /\/rasp\?groupId=(\d)*/g
             const groupIdRegex = /(\d)+/g
             const groupNumberRegex = /(\d{4})-(\d{6})(\D?)/g
@@ -188,7 +189,7 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
                 groupsMatrix[rawSubjectListNumber].push(null)
             }
 
-            const rawSubjectPlaceRegex = /schedule__place\">(.)*<\/div>/g
+            const rawSubjectPlaceRegex = /schedule__place">(.)*<\/div>/g
             const subjectPlaceRegex = />(.)*</g
             let rawSubjectPlace = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectPlaceRegex)
             if (rawSubjectPlace!==null){
@@ -259,7 +260,7 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
             }
         })
     })
-    t = transpose(groupSchedule)
+    t = groupSchedule
     })
     if (t){
     return JSON.parse(JSON.stringify(t))
@@ -270,10 +271,10 @@ async function getGroupSchedule(link, selectedWeek, selectedWeekday){
     }
 }
 
-async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
+export async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
     var t
     var subjectsMatrix = []
-    const response = await axios.get(`https://ssau.ru/rasp?staffId=${staffId}&selectedWeek=${selectedWeek}&selectedWeekday=${selectedWeekday}`)
+    await axios.get(`https://ssau.ru/rasp?staffId=${staffId}&selectedWeek=${selectedWeek}&selectedWeekday=${selectedWeekday}`)
     .then(function(res){
     let responseData=res.data
     const rawScheduleRegex = /class="schedule__time-item">((.|\n)*)class="footer"/g
@@ -331,8 +332,8 @@ async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
             else{
                 typeSubjectMatrix[rawSubjectListNumber].push(null)
             }
-            const rawGroupRegex = /href=\"\/rasp\?groupId=(.)*<\/a>/g
-            const rawGroupNumberRegex = /schedule__group\">(.)*</g
+            const rawGroupRegex = /href="\/rasp\?groupId=(.)*<\/a>/g
+            const rawGroupNumberRegex = /schedule__group">(.)*</g
             const rawGroupIdRegex = /\/rasp\?groupId=(\d)*/g
             const groupIdRegex = /(\d)+/g
             const groupNumberRegex = /(\d{4})-(\d{6})(\D)?( \(\d\))?/g
@@ -356,7 +357,7 @@ async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
                 groupsMatrix[rawSubjectListNumber].push(null)
             }
 
-            const rawSubjectPlaceRegex = /schedule__place\">(.)*<\/div>/g
+            const rawSubjectPlaceRegex = /schedule__place">(.)*<\/div>/g
             const subjectPlaceRegex = />(.)*</g
             let rawSubjectPlace = rawSubjectsMatrix[rawSubjectListNumber][rawSubjectIndex].match(rawSubjectPlaceRegex)
             if (rawSubjectPlace!==null){
@@ -388,7 +389,7 @@ async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
             }
         })
     })
-    t = transpose(lectorSchedule)
+    t = lectorSchedule
     })
     if (t){
         return JSON.parse(JSON.stringify(t))
@@ -409,7 +410,7 @@ async function getLectors(){
     let r_stuffid= /(\d)+/g
     for (let i=1;i<2;i++)
     {
-        const response = await axios.get(`https://ssau.ru/staff?page=${i}&letter=0`).then(function(res){
+        await axios.get(`https://ssau.ru/staff?page=${i}&letter=0`).then(function(res){
             let text=res.data
             let stuff= text.match(r)
             for (let j=0;j<stuff.length;j++){
@@ -443,15 +444,16 @@ app.get('/groups', async function(req, res) {
 app.get('/staff/:name', async function(req, res) {
     var lector= await DB.getLectorIdByName(connection,req.params.name)
     if (lector){
-    var text = await getLectorSchedule(String(lector),12,1)
-    res.send(text)
+    var text = await getLectorSchedule(lector,5,5)
+    res.send(text)  
     }
     else{
         res.send("Такого преподавателя нет")
     }
+
     //var text = await getLectorSchedule('64778001',12,1)
     
-    //console.log(lectors);
+    console.log(req.params.name,lector);
     
 })
 
@@ -475,6 +477,7 @@ app.get('/staff/search/:firstletters', async function(req, res) {
     var lectors= await DB.getLectorsNameStartWith(connection,req.params.firstletters)
     console.log("get lectorswith a specific first letters");
     res.send(lectors)
+    return lectors
 })
 
 // app.get('/staff?id=', async function(req, res) {
