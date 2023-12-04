@@ -25,6 +25,20 @@ function getgroupschedule(){}
 function convertElem(elem){
     if (elem){
         let color=getKeyByValue(colorDict,elem["type"][0])
+        if (elem["subject"].length>1){
+            return (
+                <td class={color}>
+                    <p>{elem["subject"][0]}</p>
+                    <p>{elem["lector"][0]["lectorName"]}</p>
+                    <p>{elem["place"][0]}</p>
+                    <p>{elem["subject"][1]}</p>
+                    <p>{elem["lector"][1]["lectorName"]}</p>
+                    <p>{elem["place"][1]}</p>
+                    <p>{elem["time"]["startTime"]}-{elem["time"]["finishTime"]}</p>
+                    
+                </td>)
+        }
+        else
         return (
             <td class={color}>
                 <p>{elem["subject"]}</p>

@@ -5,7 +5,7 @@ import axios from 'axios';
 import mysql from 'mysql2';
 
 const currentWeek=()=>{
-    return Math.floor((+new Date() - +new Date(2023, 7, 27)) / 1000 / 60 / 60 / 24 / 7)+1
+    return Math.floor((+new Date()  - +new Date(2023, 7, 27)) / 1000 / 60 / 60 / 24 / 7)+1
  }
 
 const app = express()
@@ -410,7 +410,7 @@ async function getLectors(){
     let r= /href="https:\/\/ssau\.ru\/staff\/(\d+)-(.)*">\n.*\n/g
     let r_name=/(.)*([А-ЯЁ]|[а-яё]|(\.)|( )|(-)){4,}/g
     let r_stuffid= /(\d)+/g
-    for (let i=1;i<122;i++)//122
+    for (let i=1;i<2;i++)//122
     {
         await axios.get(`https://ssau.ru/staff?page=${i}&letter=0`).then(function(res){
             let text=res.data
