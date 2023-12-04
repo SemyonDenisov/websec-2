@@ -4,6 +4,9 @@ import cors from 'cors'
 import axios from 'axios';
 import mysql from 'mysql2';
 
+const currentWeek=()=>{
+    return Math.floor((+new Date() - +new Date(2023, 7, 27)) / 1000 / 60 / 60 / 24 / 7)+1
+ }
 
 const app = express()
 app.use(cors());
@@ -35,7 +38,6 @@ app.listen(3001, async function(){
 
 //var faculties=[]
 
-const transpose = matrix => matrix[0].map((col, i) => matrix.map(row => row[i]));
 
 async function getFaculties(){
     let faculties=[]
@@ -60,7 +62,7 @@ async function getGroupsbyFaculties(faculties){
     var r_groupid=/(\d)+/g
     var r_1=  /\/rasp\?groupId=([0-9])(\d+)/g
     var r_2= /<span>([0-9]){4}-([0-9]){6}(.)<\/span>/g
-    for (let j=0;j<1;j++){ //111111111111111111111111111111111 faculties.length
+    for (let j=0;j<15;j++){ //111111111111111111111111111111111 faculties.length
         for (let i=1;i<6;i++){
         await axios.get(faculties[j])
         .then(function(res){
@@ -249,13 +251,13 @@ export async function getGroupSchedule(link, selectedWeek, selectedWeekday){
             }
             else{
                 var element = new Object()
-                    element.subject = JSON.stringify(subjectsMatrix[subjectListIndex][subjectIndex])
-                    element.time = JSON.stringify(timeMatrix[subjectListIndex])
-                    element.place = JSON.stringify(placeMatrix[subjectListIndex][subjectIndex])
-                    element.lector = JSON.stringify(lectorMatrix[subjectListIndex][0])
+                    element.subject = subjectsMatrix[subjectListIndex][subjectIndex]
+                    element.time = timeMatrix[subjectListIndex]
+                    element.place = placeMatrix[subjectListIndex][subjectIndex]
+                    element.lector = lectorMatrix[subjectListIndex][0]
                     lectorMatrix[subjectListIndex].shift()
-                    element.groups = JSON.stringify(groupsMatrix[subjectListIndex][subjectIndex])
-                    element.type = JSON.stringify(typeSubjectMatrix[subjectListIndex][subjectIndex])
+                    element.groups = groupsMatrix[subjectListIndex][subjectIndex]
+                    element.type = typeSubjectMatrix[subjectListIndex][subjectIndex]
                 groupSchedule[subjectListIndex].push(element)
             }
         })
@@ -266,8 +268,8 @@ export async function getGroupSchedule(link, selectedWeek, selectedWeekday){
     return JSON.parse(JSON.stringify(t))
     }
     else {
-        t=new Object()
-        return JSON.parse(JSON.stringify(t))
+        t=''
+        return t
     }
 }
 
@@ -395,8 +397,8 @@ export async function getLectorSchedule(staffId, selectedWeek, selectedWeekday){
         return JSON.parse(JSON.stringify(t))
         }
         else {
-            t=new Object()
-            return JSON.parse(JSON.stringify(t))
+            t=''
+            return t
         }
 }
     
@@ -408,7 +410,7 @@ async function getLectors(){
     let r= /href="https:\/\/ssau\.ru\/staff\/(\d+)-(.)*">\n.*\n/g
     let r_name=/(.)*([А-ЯЁ]|[а-яё]|(\.)|( )|(-)){4,}/g
     let r_stuffid= /(\d)+/g
-    for (let i=1;i<2;i++)
+    for (let i=1;i<122;i++)//122
     {
         await axios.get(`https://ssau.ru/staff?page=${i}&letter=0`).then(function(res){
             let text=res.data
@@ -440,32 +442,59 @@ app.get('/groups', async function(req, res) {
 })
 
 
+app.get('/groups/search/:firstletters', async function(req, res) {
+    var groups =[]
+    groups = await DB.getGroupsStartWith(connection,req.params.firstletters)
+    res.send(groups)
+    return groups
+})
 
-app.get('/staff/:name', async function(req, res) {
-    var lector= await DB.getLectorIdByName(connection,req.params.name)
-    if (lector){
-    var text = await getLectorSchedule(lector,5,5)
+
+
+app.get('/staff/:id', async function(req, res) {
+    //var lector= await DB.getLectorIdByName(connection,req.params.name)
+    let id=req.params.id
+    let week=currentWeek()
+    for (const key in req.query) {
+        if (key === "week"){
+            if(!isNaN(req.query[key])){
+                week = req.query[key]
+            }
+        }
+    }
+    var text = await getLectorSchedule(id,week,1)
+    if (text!=''){
     res.send(text)  
     }
     else{
-        res.send("Такого преподавателя нет")
+        res.send([])
     }
 
     //var text = await getLectorSchedule('64778001',12,1)
     
-    console.log(req.params.name,lector);
+    console.log(req.params.name);
     
 })
 
-app.get('/groups/:number', async function(req, res) {
-    var group= await DB.getGroupIdByNumber(connection,req.params.number)
-    console.log(group)
-    if (group){
-        var text = await getGroupSchedule(String(group),12,1)
+app.get('/groups/:id', async function(req, res) {
+    //var group= await DB.getGroupIdByNumber(connection,req.params.number)
+    //console.log(group)
+    let id=req.params.id
+    let week=currentWeek()
+    for (const key in req.query) {
+        if (key === "week"){
+            if(!isNaN(req.query[key])){
+                week = req.query[key]
+            }
+        }
+    }
+    var text = await getGroupSchedule(id,week,1)
+    console.log(req.params.id)
+    if (text!=''){
         res.send(text)
     }
     else {
-        res.send("Такой группы нет")
+        res.send([])
     }
     //var text = await getLectorSchedule('64778001',12,1)
     

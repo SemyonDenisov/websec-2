@@ -1,6 +1,7 @@
 import { response } from 'express'
 
 export function insertGroupsintoDB(connection,groups){
+    console.log(groups)
     connection.connect(function(err) {
         if (err) throw err;
         console.log("Connected!");
@@ -147,20 +148,46 @@ export function insertLectorsintoDB(connection,lectors){
     }
 
 export async function getLectorsNameStartWith(connection,firtsverbs){
+    firtsverbs=String(firtsverbs)
     var lectors=[]
     var param=firtsverbs+'%'
     await connection.promise().query("select fullname, id from lectors where fullname like ?",param)
     .then(result => {  
+        if(result[0]){
         let response=result[0]
         for(let i=0; i < response.length; i++){
             lectors.push({id:response[i].id,name:response[i].fullname})
             }  
             console.log("Success (get lectors by first verbs of name)");
-        })
+        }
+    }
+    )
         .catch(err =>{
             console.log(err);
             });
         
     return lectors
+}
+
+
+
+export async function getGroupsStartWith(connection,firtsverbs){
+    var groups=[]
+    var param=firtsverbs+'%'
+    await connection.promise().query("select group_number, id from `groups` where group_number like ?",param)
+    .then(result => {  
+        if(result[0]){
+        let response=result[0]
+        for(let i=0; i < response.length; i++){
+            groups.push({id:response[i].id,groupNumber:response[i].group_number})
+            }  
+            console.log("Success (get groups by first verbs of name)");
+        }
+    })
+        .catch(err =>{
+            console.log(err);
+            });
+    console.log(groups)
+    return groups
 }
     

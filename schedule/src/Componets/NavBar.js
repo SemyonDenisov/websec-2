@@ -12,9 +12,6 @@ export function NaviBar(){
         <Navbar.Toggle aria-controls="responsive-navbar-nav"/>
         <Navbar.Collapse id = "responsive-navbar-nav">
             <Nav classname="mr-auto">
-                <Nav.Link>
-                    <Link to="/home">Главная</Link>
-                </Nav.Link>
                 <Nav.Link >
                     <Link to="/groups">Группы</Link>
                 </Nav.Link>

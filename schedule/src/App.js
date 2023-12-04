@@ -8,7 +8,6 @@ import {
 
 import {NaviBar} from './Componets/NavBar.js'
 import {Lectors} from './Lectors.js'
-import {Home} from './Home.js'
 import {Groups} from './Groups.js'
 
 function App() {
@@ -17,7 +16,6 @@ function App() {
     <Router>
     <NaviBar/>
     <Routes>
-      <Route path="/home" element ={<Home/>}></Route>
       <Route path="/groups" element ={<Groups/>}></Route>
       <Route path="/lectors" element ={<Lectors/>}></Route>
     </Routes>
